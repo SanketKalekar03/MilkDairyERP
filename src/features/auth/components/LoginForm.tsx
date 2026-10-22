@@ -5,24 +5,20 @@ import { loginSchema } from '../schemas/authSchema';
 import type { LoginFormData } from '../schemas/authSchema';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { Milk, AlertCircle, CheckCircle2, Lock, Mail, UserPlus, LogIn, User } from 'lucide-react';
+import { Milk, AlertCircle, Lock, Mail } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { isSupabaseConfigured } from '../../../lib/supabase';
 
 export const LoginForm: React.FC = () => {
-  const { login, signup } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [fullName, setFullName] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
-  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -34,33 +30,18 @@ export const LoginForm: React.FC = () => {
 
   const onSubmit = async (data: LoginFormData) => {
     setAuthError(null);
-    setAuthSuccess(null);
-
     try {
-      if (mode === 'signin') {
-        await login(data.email, data.password);
-        navigate('/dashboard', { replace: true });
-      } else {
-        const result = await signup(data.email, data.password, fullName);
-        if (result.requiresEmailConfirm) {
-          setAuthSuccess(
-            'Account created successfully! Please check your email inbox to confirm your address before signing in.'
-          );
-        } else {
-          setAuthSuccess('Account created and verified! Redirecting to dashboard...');
-          navigate('/dashboard', { replace: true });
-        }
-      }
+      await login(data.email, data.password);
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      console.error('Auth error:', err);
-      const msg = err.message || 'Authentication failed. Please verify your credentials.';
+      console.error('Login error:', err);
+      const msg = err.message || 'Invalid email or password. Please verify your credentials.';
       setAuthError(msg);
     }
   };
 
   const handleFillDemo = (role: 'admin' | 'operator') => {
     setAuthError(null);
-    setAuthSuccess(null);
     if (role === 'admin') {
       setValue('email', 'admin@dairyerp.com');
       setValue('password', 'Admin@123456');
@@ -89,42 +70,6 @@ export const LoginForm: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 sm:px-10 rounded border border-[#afc4d4] shadow-sm">
-          {/* Mode Switch Tabs (Sign In / Register) */}
-          <div className="flex rounded bg-[#F5EFEB] p-1 mb-6 border border-[#afc4d4]">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signin');
-                setAuthError(null);
-                setAuthSuccess(null);
-              }}
-              className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center justify-center gap-1.5 ${
-                mode === 'signin'
-                  ? 'bg-white text-[#2F4156] shadow-xs'
-                  : 'text-[#567C8D] hover:text-[#2F4156]'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signup');
-                setAuthError(null);
-                setAuthSuccess(null);
-              }}
-              className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center justify-center gap-1.5 ${
-                mode === 'signup'
-                  ? 'bg-white text-[#2F4156] shadow-xs'
-                  : 'text-[#567C8D] hover:text-[#2F4156]'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              Create Account
-            </button>
-          </div>
-
           {!isSupabaseConfigured && (
             <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded text-amber-900 text-xs flex gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
@@ -139,13 +84,6 @@ export const LoginForm: React.FC = () => {
             </div>
           )}
 
-          {authSuccess && (
-            <div className="mb-5 p-3.5 bg-emerald-50 border border-emerald-300 rounded text-emerald-900 text-xs flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div className="leading-relaxed font-medium">{authSuccess}</div>
-            </div>
-          )}
-
           {authError && (
             <div className="mb-5 p-3.5 bg-rose-50 border border-rose-300 rounded text-rose-900 text-xs flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
@@ -154,31 +92,6 @@ export const LoginForm: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {mode === 'signup' && (
-              <div>
-                <label
-                  htmlFor="full_name"
-                  className="block text-xs font-semibold uppercase tracking-wider text-[#2F4156] mb-1.5"
-                >
-                  Full Name / Proprietor Name
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#567C8D]">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <input
-                    id="full_name"
-                    type="text"
-                    disabled={isSubmitting}
-                    placeholder="e.g. Balasaheb Patil"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-white text-[#2F4156] pl-9 pr-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label
                 htmlFor="email"
@@ -195,7 +108,7 @@ export const LoginForm: React.FC = () => {
                   type="email"
                   autoComplete="email"
                   disabled={isSubmitting}
-                  placeholder="proprietor@omsai.com"
+                  placeholder="admin@dairyerp.com"
                   className="w-full bg-white text-[#2F4156] pl-9 pr-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
                   {...register('email')}
                 />
@@ -221,7 +134,7 @@ export const LoginForm: React.FC = () => {
                 <input
                   id="password"
                   type="password"
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  autoComplete="current-password"
                   disabled={isSubmitting}
                   placeholder="••••••••"
                   className="w-full bg-white text-[#2F4156] pl-9 pr-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
@@ -241,9 +154,9 @@ export const LoginForm: React.FC = () => {
                 variant="primary"
                 className="w-full py-2.5"
                 isLoading={isSubmitting}
-                loadingText={mode === 'signin' ? 'Verifying credentials...' : 'Registering account...'}
+                loadingText="Verifying credentials..."
               >
-                {mode === 'signin' ? 'Sign In to Dairy ERP' : 'Create Account'}
+                Sign In to Dairy ERP
               </Button>
             </div>
           </form>
