@@ -21,7 +21,7 @@ import { isSupabaseConfigured } from '../lib/supabase';
 
 // Protected Route Guard
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -36,7 +36,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <>{children}</>;
   }
 
-  if (!user || !profile || !profile.is_active) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
@@ -55,12 +55,11 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   }
 
-  // If Supabase not configured yet, allow demo viewing
   if (!isSupabaseConfigured) {
     return <>{children}</>;
   }
 
-  if (profile?.role !== 'admin') {
+  if (profile && profile.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -69,7 +68,7 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 // Public Only Route Guard (for /login)
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -79,7 +78,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   }
 
-  if (user && profile?.is_active) {
+  if (user) {
     return <Navigate to="/dashboard" replace />;
   }
 

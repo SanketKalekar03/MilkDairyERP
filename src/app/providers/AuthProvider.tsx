@@ -11,6 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, fullName?: string) => Promise<{ requiresEmailConfirm: boolean }>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -29,10 +30,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const p = await authService.getProfile(userId);
       setProfile(p);
       setError(null);
+      return p;
     } catch (err: any) {
       console.error('Failed to load user profile:', err);
-      setProfile(null);
       setError(err.message || 'Profile could not be loaded');
+      return null;
     }
   };
 
@@ -43,28 +45,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Initial session retrieval
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadUserProfile(session.user.id).finally(() => setIsLoading(false));
-      } else {
-        setIsLoading(false);
+        await loadUserProfile(session.user.id);
       }
+      setIsLoading(false);
+    }).catch(() => {
+      setIsLoading(false);
     });
 
     // Listen to Auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await loadUserProfile(session.user.id);
+    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      if (newSession?.user) {
+        await loadUserProfile(newSession.user.id);
       } else {
         setProfile(null);
       }
-      setIsLoading(false);
     });
 
     return () => {
@@ -73,7 +75,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
     setError(null);
     try {
       const result = await authService.signIn(email, password);
@@ -83,20 +84,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       setError(err.message || 'Login failed');
       throw err;
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const signup = async (email: string, password: string, fullName?: string) => {
+    setError(null);
+    try {
+      const result = await authService.signUp(email, password, fullName);
+      if (result.session && result.profile) {
+        setUser(result.user);
+        setSession(result.session);
+        setProfile(result.profile);
+        return { requiresEmailConfirm: false };
+      }
+      return { requiresEmailConfirm: true };
+    } catch (err: any) {
+      setError(err.message || 'Registration failed');
+      throw err;
     }
   };
 
   const logout = async () => {
-    setIsLoading(true);
     try {
       await authService.signOut();
       setUser(null);
       setSession(null);
       setProfile(null);
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.warn('Logout error:', err);
     }
   };
 
@@ -115,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         error,
         login,
+        signup,
         logout,
         refreshProfile,
       }}
