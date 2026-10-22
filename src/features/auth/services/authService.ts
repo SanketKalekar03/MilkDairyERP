@@ -17,10 +17,12 @@ export const authService = {
 
     if (error) {
       if (error.message.includes('Invalid login credentials')) {
-        throw new Error('Invalid email or password. Please verify your credentials or create an account.');
+        throw new Error(
+          'Invalid email or password. If this is a new database setup, please run the SQL seed script in your Supabase SQL Editor to create the Admin & Operator accounts.'
+        );
       }
       if (error.message.includes('Email not confirmed')) {
-        throw new Error('Email is not confirmed yet. Please verify your email or disable email confirmations in Supabase Auth settings.');
+        throw new Error('Email is not confirmed yet. Please verify your email or run the seed script to confirm accounts.');
       }
       throw new Error(error.message || 'Failed to sign in');
     }

@@ -5,15 +5,38 @@ import { loginSchema } from '../schemas/authSchema';
 import type { LoginFormData } from '../schemas/authSchema';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { Milk, AlertCircle, Lock, Mail } from 'lucide-react';
+import {
+  Milk,
+  AlertCircle,
+  Lock,
+  Mail,
+  Copy,
+  Check,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Database,
+  Wrench,
+} from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { isSupabaseConfigured } from '../../../lib/supabase';
+import { QUICK_FIX_TOKENS_SQL, COMPLETE_SEED_SQL } from '../constants/seedSql';
 
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const [authError, setAuthError] = useState<string | null>(null);
+  const [quickRoleLoading, setQuickRoleLoading] = useState<'admin' | 'operator' | null>(null);
+  const [copiedType, setCopiedType] = useState<'quick' | 'full' | null>(null);
+  const [showSql, setShowSql] = useState(false);
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  const sqlEditorUrl = projectRef
+    ? `https://supabase.com/dashboard/project/${projectRef}/sql/new`
+    : 'https://supabase.com/dashboard';
 
   const {
     register,
@@ -40,16 +63,59 @@ export const LoginForm: React.FC = () => {
     }
   };
 
-  const handleFillDemo = (role: 'admin' | 'operator') => {
+  const handleQuickLogin = async (role: 'admin' | 'operator') => {
     setAuthError(null);
-    if (role === 'admin') {
-      setValue('email', 'admin@dairyerp.com');
-      setValue('password', 'Admin@123456');
-    } else {
-      setValue('email', 'operator@dairyerp.com');
-      setValue('password', 'Operator@123456');
+    const email = role === 'admin' ? 'admin@dairyerp.com' : 'operator@dairyerp.com';
+    const password = role === 'admin' ? 'Admin@123456' : 'Operator@123456';
+
+    setValue('email', email, { shouldValidate: true });
+    setValue('password', password, { shouldValidate: true });
+
+    setQuickRoleLoading(role);
+    try {
+      await login(email, password);
+      navigate('/dashboard', { replace: true });
+    } catch (err: any) {
+      console.error('Quick login error:', err);
+      const msg = err.message || 'Login failed. Please verify credentials.';
+      setAuthError(msg);
+    } finally {
+      setQuickRoleLoading(null);
     }
   };
+
+  const handleCopyQuickFix = async () => {
+    try {
+      await navigator.clipboard.writeText(QUICK_FIX_TOKENS_SQL);
+      setCopiedType('quick');
+      setTimeout(() => setCopiedType(null), 3500);
+    } catch (err) {
+      console.error('Failed to copy quick fix SQL:', err);
+    }
+  };
+
+  const handleCopyFullSeed = async () => {
+    try {
+      await navigator.clipboard.writeText(COMPLETE_SEED_SQL);
+      setCopiedType('full');
+      setTimeout(() => setCopiedType(null), 3500);
+    } catch (err) {
+      console.error('Failed to copy seed SQL:', err);
+    }
+  };
+
+  const isSchemaError =
+    authError &&
+    (authError.toLowerCase().includes('schema') ||
+      authError.toLowerCase().includes('database error'));
+
+  const isMissingUserError =
+    authError &&
+    (authError.toLowerCase().includes('seed') ||
+      authError.toLowerCase().includes('invalid email or password') ||
+      authError.toLowerCase().includes('invalid login credentials'));
+
+  const isProcessing = isSubmitting || quickRoleLoading !== null;
 
   return (
     <div className="min-h-screen bg-[#F5EFEB] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -84,13 +150,88 @@ export const LoginForm: React.FC = () => {
             </div>
           )}
 
+          {/* Error Banner */}
           {authError && (
-            <div className="mb-5 p-3.5 bg-rose-50 border border-rose-300 rounded text-rose-900 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="leading-relaxed font-medium">{authError}</div>
+            <div className="mb-5 p-3.5 bg-rose-50 border border-rose-300 rounded text-rose-900 text-xs flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="leading-relaxed font-medium">
+                  {isSchemaError ? (
+                    <span>
+                      <strong>Database error querying schema:</strong> The user records in Supabase{' '}
+                      <code className="bg-rose-100 px-1 py-0.5 rounded font-mono text-[11px]">auth.users</code> contain{' '}
+                      <code className="bg-rose-100 px-1 py-0.5 rounded font-mono text-[11px]">NULL</code> token values.
+                      Supabase requires empty strings <code className="bg-rose-100 px-1 py-0.5 rounded font-mono text-[11px]">''</code>.
+                    </span>
+                  ) : (
+                    authError
+                  )}
+                </div>
+              </div>
+
+              {/* Actionable Resolution Buttons */}
+              {(isSchemaError || isMissingUserError) && (
+                <div className="mt-2 pt-2 border-t border-rose-200 text-rose-800 space-y-2">
+                  <p className="font-semibold text-[11px] uppercase tracking-wide text-rose-900 flex items-center gap-1.5">
+                    <Wrench className="w-3.5 h-3.5 text-rose-700" />
+                    <span>Quick Fix (Run in SQL Editor tab):</span>
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {/* Quick Fix Button (Primary when schema error) */}
+                    <button
+                      type="button"
+                      onClick={handleCopyQuickFix}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-[#2F4156] text-white hover:bg-[#1f2b38] transition-colors cursor-pointer"
+                    >
+                      {copiedType === 'quick' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300" />
+                          <span>Copied 4-Line Fix SQL!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy 4-Line Fix SQL</span>
+                        </>
+                      )}
+                    </button>
+
+                    <a
+                      href={sqlEditorUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded border border-[#afc4d4] bg-white text-[#2F4156] hover:bg-gray-50 transition-colors"
+                    >
+                      <span>Open SQL Tab</span>
+                      <ExternalLink className="w-3 h-3 text-[#567C8D]" />
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowSql(!showSql)}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-[#567C8D] hover:underline ml-auto"
+                    >
+                      <span>{showSql ? 'Hide SQL' : 'View Fix SQL'}</span>
+                      {showSql ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                  </div>
+
+                  {showSql && (
+                    <div className="mt-2 bg-slate-900 text-slate-100 p-2.5 rounded text-[11px] font-mono overflow-x-auto">
+                      <pre className="whitespace-pre-wrap">{QUICK_FIX_TOKENS_SQL}</pre>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-rose-700">
+                    Switch to your open <strong>SQL Editor</strong> tab, paste the 4 lines, click <strong>Run</strong>, then click <strong>Operator</strong> below.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
+          {/* Sign In Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <label
@@ -107,7 +248,7 @@ export const LoginForm: React.FC = () => {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  disabled={isSubmitting}
+                  disabled={isProcessing}
                   placeholder="admin@dairyerp.com"
                   className="w-full bg-white text-[#2F4156] pl-9 pr-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
                   {...register('email')}
@@ -135,7 +276,7 @@ export const LoginForm: React.FC = () => {
                   id="password"
                   type="password"
                   autoComplete="current-password"
-                  disabled={isSubmitting}
+                  disabled={isProcessing}
                   placeholder="••••••••"
                   className="w-full bg-white text-[#2F4156] pl-9 pr-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
                   {...register('password')}
@@ -152,38 +293,107 @@ export const LoginForm: React.FC = () => {
               <Button
                 type="submit"
                 variant="primary"
-                className="w-full py-2.5"
-                isLoading={isSubmitting}
+                className="w-full py-2.5 font-medium"
+                isLoading={isSubmitting && quickRoleLoading === null}
                 loadingText="Verifying credentials..."
+                disabled={isProcessing}
               >
                 Sign In to Dairy ERP
               </Button>
             </div>
           </form>
 
-          {/* Quick Fill Credentials Pills */}
+          {/* Quick Sign-In Credential Buttons */}
           <div className="mt-6 pt-5 border-t border-[#afc4d4]">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#567C8D] mb-2.5 text-center">
-              Quick Fill Credentials
-            </p>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#567C8D]">
+                1-Click Quick Sign In
+              </p>
+              <span className="text-[10px] text-[#567C8D] bg-[#F5EFEB] px-1.5 py-0.5 rounded border border-[#afc4d4]">
+                Auto Logs In
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
+              {/* Admin Quick Login Button */}
               <button
                 type="button"
-                onClick={() => handleFillDemo('admin')}
-                className="text-left p-2 rounded border border-[#afc4d4] hover:bg-[#F5EFEB] transition-colors"
+                disabled={isProcessing}
+                onClick={() => handleQuickLogin('admin')}
+                className={`text-left p-2.5 rounded border transition-colors ${
+                  quickRoleLoading === 'admin'
+                    ? 'border-[#2F4156] bg-[#C8D9E6]/30'
+                    : 'border-[#afc4d4] hover:border-[#2F4156] hover:bg-[#F5EFEB]'
+                } ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className="text-xs font-bold text-[#2F4156]">Admin</div>
-                <div className="text-[10px] text-[#567C8D] truncate">admin@dairyerp.com</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#2F4156]">Admin</span>
+                  {quickRoleLoading === 'admin' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2F4156]" />
+                  ) : (
+                    <span className="text-[9px] uppercase font-semibold text-[#567C8D] bg-white px-1 py-0.5 rounded border border-[#afc4d4]">
+                      Full Access
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-[#567C8D] truncate mt-0.5">admin@dairyerp.com</div>
+                <div className="text-[10px] text-[#2F4156] font-mono mt-1 opacity-75">
+                  {quickRoleLoading === 'admin' ? 'Logging in...' : 'Click to Log In →'}
+                </div>
               </button>
+
+              {/* Operator Quick Login Button */}
               <button
                 type="button"
-                onClick={() => handleFillDemo('operator')}
-                className="text-left p-2 rounded border border-[#afc4d4] hover:bg-[#F5EFEB] transition-colors"
+                disabled={isProcessing}
+                onClick={() => handleQuickLogin('operator')}
+                className={`text-left p-2.5 rounded border transition-colors ${
+                  quickRoleLoading === 'operator'
+                    ? 'border-[#2F4156] bg-[#C8D9E6]/30'
+                    : 'border-[#afc4d4] hover:border-[#2F4156] hover:bg-[#F5EFEB]'
+                } ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <div className="text-xs font-bold text-[#2F4156]">Operator</div>
-                <div className="text-[10px] text-[#567C8D] truncate">operator@dairyerp.com</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#2F4156]">Operator</span>
+                  {quickRoleLoading === 'operator' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2F4156]" />
+                  ) : (
+                    <span className="text-[9px] uppercase font-semibold text-[#567C8D] bg-white px-1 py-0.5 rounded border border-[#afc4d4]">
+                      Shift Desk
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-[#567C8D] truncate mt-0.5">operator@dairyerp.com</div>
+                <div className="text-[10px] text-[#2F4156] font-mono mt-1 opacity-75">
+                  {quickRoleLoading === 'operator' ? 'Logging in...' : 'Click to Log In →'}
+                </div>
               </button>
             </div>
+          </div>
+
+          {/* Database Setup Helper Pill */}
+          <div className="mt-4 pt-3 border-t border-[#afc4d4]/60 flex items-center justify-between text-[11px] text-[#567C8D]">
+            <span className="flex items-center gap-1">
+              <Database className="w-3.5 h-3.5 text-[#567C8D]" />
+              <span>Database seed script</span>
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyFullSeed}
+              className="text-[#2F4156] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              {copiedType === 'full' ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  <span className="text-emerald-700">Seed SQL Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Copy Complete Seed SQL</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
