@@ -9,9 +9,7 @@ export const milkCollectionSchema = z.object({
     .number({ invalid_type_error: 'Quantity must be a valid number' })
     .positive('Quantity must be greater than 0')
     .max(9999.999, 'Quantity exceeds maximum allowed'),
-  quantity_unit: z.enum(['kg', 'litre'], {
-    required_error: 'Quantity unit is required',
-  }),
+  quantity_unit: z.enum(['litre']).default('litre'),
   fat_percent: z
     .number({ invalid_type_error: 'Fat percentage must be a number' })
     .min(0, 'Fat percentage cannot be negative')

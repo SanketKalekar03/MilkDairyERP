@@ -1,7 +1,6 @@
 import React from 'react';
-import { Menu, Sun, Moon, Calendar, AlertCircle } from 'lucide-react';
+import { Menu, Sun, Moon } from 'lucide-react';
 import type { MilkShift } from '../../types/database';
-import { formatDate } from '../../lib/utils';
 
 export interface TopbarProps {
   onToggleSidebar: () => void;
@@ -17,13 +16,11 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleSidebar,
   currentShift = 'morning',
   isShiftActive = true,
-  businessDate,
   morningWindow,
   eveningWindow,
   userName,
 }) => {
   const isMorning = currentShift === 'morning';
-  const todayFormatted = formatDate(businessDate || new Date().toISOString().split('T')[0]);
 
   return (
     <header className="h-16 bg-white border-b border-[#afc4d4] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
@@ -76,14 +73,8 @@ export const Topbar: React.FC<TopbarProps> = ({
         </div>
       </div>
 
-      {/* Right: Date & User */}
+      {/* Right: User */}
       <div className="flex items-center gap-3 sm:gap-4">
-        {/* Today's Business Date */}
-        <div className="flex items-center gap-1.5 text-xs font-medium text-[#2F4156] bg-white px-2.5 py-1 rounded border border-[#afc4d4]">
-          <Calendar className="w-3.5 h-3.5 text-[#567C8D]" />
-          <span>{todayFormatted}</span>
-        </div>
-
         {/* Greeting / User avatar initial */}
         {userName && (
           <div className="flex items-center gap-2">

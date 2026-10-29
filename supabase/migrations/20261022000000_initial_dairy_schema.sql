@@ -46,10 +46,10 @@ CREATE TABLE IF NOT EXISTS dairy_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   dairy_name TEXT NOT NULL DEFAULT 'Dairy Milk Collection & Sales',
   timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
-  morning_start TIME NOT NULL DEFAULT '04:00:00',
-  morning_end TIME NOT NULL DEFAULT '12:00:00',
-  evening_start TIME NOT NULL DEFAULT '15:00:00',
-  evening_end TIME NOT NULL DEFAULT '22:00:00',
+  morning_start TIME NOT NULL DEFAULT '06:00:00',
+  morning_end TIME NOT NULL DEFAULT '18:00:00',
+  evening_start TIME NOT NULL DEFAULT '18:00:00',
+  evening_end TIME NOT NULL DEFAULT '06:00:00',
   is_default BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -477,43 +477,42 @@ DECLARE
   v_local_time TIME;
   v_business_date DATE;
   v_shift milk_shift;
-  v_is_active BOOLEAN := false;
+  v_is_active BOOLEAN := true;
+  v_morning_start TIME := '06:00:00'::time;
+  v_morning_end TIME := '18:00:00'::time;
+  v_evening_start TIME := '18:00:00'::time;
+  v_evening_end TIME := '06:00:00'::time;
+  v_timezone TEXT := 'Asia/Kolkata';
 BEGIN
   -- Get active dairy settings
   SELECT * INTO v_settings FROM dairy_settings WHERE is_default = true LIMIT 1;
-  IF NOT FOUND THEN
-    -- Fallback default settings if not initialized yet
-    v_settings.timezone := 'Asia/Kolkata';
-    v_settings.morning_start := '04:00:00'::time;
-    v_settings.morning_end := '12:00:00'::time;
-    v_settings.evening_start := '15:00:00'::time;
-    v_settings.evening_end := '22:00:00'::time;
+  IF FOUND THEN
+    IF v_settings.timezone IS NOT NULL THEN v_timezone := v_settings.timezone; END IF;
+    IF v_settings.morning_start IS NOT NULL THEN v_morning_start := v_settings.morning_start; END IF;
+    IF v_settings.morning_end IS NOT NULL THEN v_morning_end := v_settings.morning_end; END IF;
+    IF v_settings.evening_start IS NOT NULL THEN v_evening_start := v_settings.evening_start; END IF;
+    IF v_settings.evening_end IS NOT NULL THEN v_evening_end := v_settings.evening_end; END IF;
   END IF;
 
   -- Convert server time to dairy timezone
-  v_local_timestamp := timezone(v_settings.timezone, now());
+  v_local_timestamp := timezone(v_timezone, now());
   v_local_time := v_local_timestamp::time;
   v_business_date := v_local_timestamp::date;
 
-  -- Check morning shift
-  IF v_local_time >= v_settings.morning_start AND v_local_time < v_settings.morning_end THEN
+  -- Morning Shift: starts at 06:00 and ends at 18:00
+  IF v_local_time >= v_morning_start AND v_local_time < v_evening_start THEN
     v_shift := 'morning';
     v_is_active := true;
-  -- Check evening shift
-  ELSIF v_local_time >= v_settings.evening_start AND v_local_time < v_settings.evening_end THEN
-    v_shift := 'evening';
-    v_is_active := true;
-  -- Boundary / between shifts: determine closest shift
-  ELSIF v_local_time < v_settings.morning_start THEN
-    v_shift := 'morning';
-    v_is_active := false;
-  ELSIF v_local_time >= v_settings.morning_end AND v_local_time < v_settings.evening_start THEN
-    v_shift := 'evening';
-    v_is_active := false;
+    v_business_date := v_local_timestamp::date;
   ELSE
-    -- After evening shift ends: upcoming is next morning
-    v_shift := 'morning';
-    v_is_active := false;
+    -- Evening Shift: starts at 18:00 and ends at 06:00
+    v_shift := 'evening';
+    v_is_active := true;
+    IF v_local_time < v_morning_start THEN
+      v_business_date := (v_local_timestamp - INTERVAL '1 day')::date;
+    ELSE
+      v_business_date := v_local_timestamp::date;
+    END IF;
   END IF;
 
   RETURN jsonb_build_object(
@@ -521,12 +520,12 @@ BEGIN
     'business_date', v_business_date,
     'is_active', v_is_active,
     'local_time', to_char(v_local_time, 'HH24:MI:SS'),
-    'timezone', v_settings.timezone,
-    'morning_window', concat(to_char(v_settings.morning_start, 'HH24:MI'), ' - ', to_char(v_settings.morning_end, 'HH24:MI')),
-    'evening_window', concat(to_char(v_settings.evening_start, 'HH24:MI'), ' - ', to_char(v_settings.evening_end, 'HH24:MI'))
+    'timezone', v_timezone,
+    'morning_window', concat(to_char(v_morning_start, 'HH24:MI'), ' - ', to_char(v_evening_start, 'HH24:MI')),
+    'evening_window', concat(to_char(v_evening_start, 'HH24:MI'), ' - ', to_char(v_morning_start, 'HH24:MI'))
   );
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- Function: get_applicable_collection_rate
 CREATE OR REPLACE FUNCTION get_applicable_collection_rate(

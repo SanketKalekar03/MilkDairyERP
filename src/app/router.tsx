@@ -13,6 +13,7 @@ import { CollectionRateList } from '../features/collection-rates/components/Coll
 import { SellingRateList } from '../features/selling-rates/components/SellingRateList';
 import { FarmerBillingView } from '../features/weekly-billing/components/FarmerBillingView';
 import { CustomerBillingView } from '../features/weekly-billing/components/CustomerBillingView';
+import { MilkStockView } from '../features/stock/components/MilkStockView';
 import { ShiftSettingsForm } from '../features/settings/components/ShiftSettingsForm';
 import { UserManagementList } from '../features/users/components/UserManagementList';
 import { useAuth } from '../features/auth/hooks/useAuth';
@@ -109,6 +110,10 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <DashboardView />,
+      },
+      {
+        path: 'stock',
+        element: <MilkStockView />,
       },
       {
         path: 'farmers',

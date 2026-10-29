@@ -22,7 +22,7 @@ export const collectionRateService = {
 
   async createCollectionRate(rule: {
     milk_type: MilkType;
-    quantity_unit: QuantityUnit;
+    quantity_unit?: QuantityUnit;
     fat_min: number;
     fat_max: number;
     rate_per_unit: number;
@@ -35,7 +35,7 @@ export const collectionRateService = {
       .from('collection_rate_rules')
       .insert({
         milk_type: rule.milk_type,
-        quantity_unit: rule.quantity_unit,
+        quantity_unit: rule.quantity_unit || 'litre',
         fat_min: rule.fat_min,
         fat_max: rule.fat_max,
         rate_per_unit: rule.rate_per_unit,

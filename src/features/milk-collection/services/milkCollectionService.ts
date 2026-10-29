@@ -52,7 +52,7 @@ export const milkCollectionService = {
     farmerId: string;
     milkType: MilkType;
     quantity: number;
-    quantityUnit: QuantityUnit;
+    quantityUnit?: QuantityUnit;
     fatPercent: number;
   }) {
     if (!isSupabaseConfigured) {
@@ -64,7 +64,7 @@ export const milkCollectionService = {
       p_farmer_id: input.farmerId,
       p_milk_type: input.milkType,
       p_quantity: input.quantity,
-      p_quantity_unit: input.quantityUnit,
+      p_quantity_unit: input.quantityUnit || 'litre',
       p_fat_percent: input.fatPercent,
     });
 

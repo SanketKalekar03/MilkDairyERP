@@ -16,12 +16,11 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
-  Database,
   Wrench,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { isSupabaseConfigured } from '../../../lib/supabase';
-import { QUICK_FIX_TOKENS_SQL, COMPLETE_SEED_SQL } from '../constants/seedSql';
+import { QUICK_FIX_TOKENS_SQL } from '../constants/seedSql';
 
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
@@ -91,16 +90,6 @@ export const LoginForm: React.FC = () => {
       setTimeout(() => setCopiedType(null), 3500);
     } catch (err) {
       console.error('Failed to copy quick fix SQL:', err);
-    }
-  };
-
-  const handleCopyFullSeed = async () => {
-    try {
-      await navigator.clipboard.writeText(COMPLETE_SEED_SQL);
-      setCopiedType('full');
-      setTimeout(() => setCopiedType(null), 3500);
-    } catch (err) {
-      console.error('Failed to copy seed SQL:', err);
     }
   };
 
@@ -369,31 +358,6 @@ export const LoginForm: React.FC = () => {
                 </div>
               </button>
             </div>
-          </div>
-
-          {/* Database Setup Helper Pill */}
-          <div className="mt-4 pt-3 border-t border-[#afc4d4]/60 flex items-center justify-between text-[11px] text-[#567C8D]">
-            <span className="flex items-center gap-1">
-              <Database className="w-3.5 h-3.5 text-[#567C8D]" />
-              <span>Database seed script</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleCopyFullSeed}
-              className="text-[#2F4156] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              {copiedType === 'full' ? (
-                <>
-                  <Check className="w-3 h-3 text-emerald-600" />
-                  <span className="text-emerald-700">Seed SQL Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3" />
-                  <span>Copy Complete Seed SQL</span>
-                </>
-              )}
-            </button>
           </div>
         </div>
 

@@ -10,7 +10,7 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { ShiftBadge } from '../../../components/ui/ShiftBadge';
-import { MILK_TYPES, QUANTITY_UNITS } from '../../../lib/constants';
+import { MILK_TYPES } from '../../../lib/constants';
 import { formatCurrency, formatDate } from '../../../lib/utils';
 import { Milk, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 
@@ -42,15 +42,13 @@ export const MilkCollectionForm: React.FC = () => {
   });
 
   const selectedMilkType = watch('milk_type');
-  const selectedUnit = watch('quantity_unit');
   const enteredQty = watch('quantity');
   const enteredFat = watch('fat_percent');
 
-  // Preview applicable rate when milk_type, unit, or fat_percent changes
+  // Preview applicable rate when milk_type or fat_percent changes
   useEffect(() => {
     if (
       selectedMilkType &&
-      selectedUnit &&
       enteredFat !== undefined &&
       !isNaN(enteredFat) &&
       enteredFat >= 0
@@ -62,7 +60,7 @@ export const MilkCollectionForm: React.FC = () => {
           const date = shiftInfo?.business_date || new Date().toISOString().split('T')[0];
           const result = await milkCollectionService.getApplicableRate(
             selectedMilkType,
-            selectedUnit,
+            'litre',
             Number(enteredFat),
             date
           );
@@ -80,7 +78,7 @@ export const MilkCollectionForm: React.FC = () => {
       setPreviewRate(null);
       setRateError(null);
     }
-  }, [selectedMilkType, selectedUnit, enteredFat, shiftInfo?.business_date]);
+  }, [selectedMilkType, enteredFat, shiftInfo?.business_date]);
 
   const estimatedAmount =
     previewRate !== null && enteredQty && !isNaN(enteredQty) && enteredQty > 0
@@ -95,21 +93,21 @@ export const MilkCollectionForm: React.FC = () => {
         farmerId: data.farmer_id,
         milkType: data.milk_type,
         quantity: Number(data.quantity),
-        quantityUnit: data.quantity_unit,
+        quantityUnit: 'litre',
         fatPercent: Number(data.fat_percent),
       });
 
       setSuccessMessage(
         `Milk collection recorded successfully! Farmer: ${response.farmer_name}, Amount: ${formatCurrency(
           response.amount
-        )} (Rate: ₹${response.applied_rate}/${data.quantity_unit})`
+        )} (Rate: ₹${response.applied_rate}/L)`
       );
 
-      // Reset form but keep current milk type and unit for rapid repeated entry
+      // Reset form but keep current milk type for rapid repeated entry
       reset({
         farmer_id: '',
         milk_type: data.milk_type,
-        quantity_unit: data.quantity_unit,
+        quantity_unit: 'litre',
         quantity: undefined,
         fat_percent: undefined,
       });
@@ -125,7 +123,7 @@ export const MilkCollectionForm: React.FC = () => {
     <div className="max-w-3xl mx-auto space-y-6">
       <PageHeader
         title="Record Milk Collection"
-        subtitle="Collect milk from farmers in either Kilograms (kg) or Litres (L)."
+        subtitle="Collect milk from farmers in Litres (L)."
       />
 
       {/* Current Shift Informational Notice */}
@@ -208,7 +206,7 @@ export const MilkCollectionForm: React.FC = () => {
               )}
             </div>
 
-            {/* Milk Type and Quantity Unit Grid */}
+            {/* Milk Type and Unit Display */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Milk Type */}
               <div>
@@ -232,26 +230,17 @@ export const MilkCollectionForm: React.FC = () => {
                 </select>
               </div>
 
-              {/* Quantity Unit */}
+              {/* Measurement Unit */}
               <div>
-                <label
-                  htmlFor="quantity_unit"
-                  className="block text-xs font-semibold uppercase tracking-wider text-[#2F4156] mb-1.5"
-                >
-                  Unit of Measurement <span className="text-red-500">*</span>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#2F4156] mb-1.5">
+                  Measurement Unit
                 </label>
-                <select
-                  id="quantity_unit"
-                  disabled={isSubmitting}
-                  className="w-full bg-white text-[#2F4156] px-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
-                  {...register('quantity_unit')}
-                >
-                  {QUANTITY_UNITS.map((u) => (
-                    <option key={u.value} value={u.value}>
-                      {u.label}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  readOnly
+                  value="Litre (L)"
+                  className="w-full bg-[#F5EFEB] text-[#2F4156] px-3 py-2 text-sm rounded border border-[#afc4d4] font-medium cursor-not-allowed"
+                />
               </div>
             </div>
 
@@ -263,7 +252,7 @@ export const MilkCollectionForm: React.FC = () => {
                   htmlFor="quantity"
                   className="block text-xs font-semibold uppercase tracking-wider text-[#2F4156] mb-1.5"
                 >
-                  Quantity ({selectedUnit}) <span className="text-red-500">*</span>
+                  Quantity (Litres) <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="quantity"
@@ -319,10 +308,18 @@ export const MilkCollectionForm: React.FC = () => {
                   {isCheckingRate ? (
                     <span className="text-xs text-gray-500">Checking rate rule...</span>
                   ) : rateError ? (
-                    <span className="text-xs text-rose-600 font-medium">{rateError}</span>
+                    <div className="text-xs text-rose-600 font-medium space-y-1">
+                      <div>{rateError}</div>
+                      <div className="text-[11px] text-[#567C8D]">
+                        Need to adjust?{' '}
+                        <a href="/rates/collection" className="underline font-semibold text-[#2F4156] hover:text-[#567C8D]">
+                          Manage Collection Rates
+                        </a>
+                      </div>
+                    </div>
                   ) : previewRate !== null ? (
                     <span>
-                      ₹{previewRate.toFixed(2)} / {selectedUnit}
+                      ₹{previewRate.toFixed(2)} / Litre
                     </span>
                   ) : (
                     <span className="text-xs text-gray-400">

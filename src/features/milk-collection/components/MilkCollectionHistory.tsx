@@ -211,9 +211,9 @@ export const MilkCollectionHistory: React.FC = () => {
                   <th className="py-3 px-4">Date & Shift</th>
                   <th className="py-3 px-4">Farmer</th>
                   <th className="py-3 px-4">Milk Type</th>
-                  <th className="py-3 px-4 text-right">Quantity</th>
+                  <th className="py-3 px-4 text-right">Quantity (L)</th>
                   <th className="py-3 px-4 text-right">Fat %</th>
-                  <th className="py-3 px-4 text-right">Applied Rate</th>
+                  <th className="py-3 px-4 text-right">Rate (₹/L)</th>
                   <th className="py-3 px-4 text-right">Amount (₹)</th>
                 </tr>
               </thead>
@@ -235,13 +235,13 @@ export const MilkCollectionHistory: React.FC = () => {
                       <MilkTypeBadge type={c.milk_type} />
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums text-gray-700">
-                      {formatQuantity(c.quantity, c.quantity_unit)}
+                      {formatQuantity(c.quantity)}
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums text-gray-700">
                       {c.fat_percent.toFixed(1)}%
                     </td>
                     <td className="py-3 px-4 text-right font-mono tabular-nums text-gray-700">
-                      ₹{c.applied_rate.toFixed(2)}/{c.quantity_unit}
+                      ₹{c.applied_rate.toFixed(2)}/L
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-[#2F4156] tabular-nums text-sm">
                       {formatCurrency(c.amount)}

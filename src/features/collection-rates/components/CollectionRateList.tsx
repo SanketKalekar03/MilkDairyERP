@@ -37,7 +37,7 @@ export const CollectionRateList: React.FC = () => {
     <div className="space-y-4">
       <PageHeader
         title="Collection Rate Rules"
-        subtitle="Manage fat-based purchasing rates for cow and buffalo milk in kg and litres."
+        subtitle="Manage fat-based purchasing rates for cow and buffalo milk in Litres."
         actions={
           <Button
             variant="primary"
@@ -105,9 +105,8 @@ export const CollectionRateList: React.FC = () => {
               <thead>
                 <tr className="bg-[#F5EFEB] border-b border-[#afc4d4] text-[11px] font-bold uppercase tracking-wider text-[#567C8D]">
                   <th className="py-3 px-4">Milk Type</th>
-                  <th className="py-3 px-4">Unit</th>
                   <th className="py-3 px-4">Fat Range</th>
-                  <th className="py-3 px-4 text-right">Rate per Unit</th>
+                  <th className="py-3 px-4 text-right">Rate (₹ / Litre)</th>
                   <th className="py-3 px-4">Effective Period</th>
                   <th className="py-3 px-4">Status</th>
                 </tr>
@@ -118,14 +117,11 @@ export const CollectionRateList: React.FC = () => {
                     <td className="py-3 px-4">
                       <MilkTypeBadge type={r.milk_type} />
                     </td>
-                    <td className="py-3 px-4 uppercase font-bold text-[#2F4156]">
-                      {r.quantity_unit}
-                    </td>
                     <td className="py-3 px-4 font-mono text-gray-700">
                       {r.fat_min.toFixed(1)}% — {r.fat_max.toFixed(1)}%
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-[#2F4156] tabular-nums text-sm">
-                      ₹{r.rate_per_unit.toFixed(2)} / {r.quantity_unit}
+                      ₹{r.rate_per_unit.toFixed(2)} / L
                     </td>
                     <td className="py-3 px-4 text-[#567C8D]">
                       {formatDate(r.valid_from)} to {r.valid_to ? formatDate(r.valid_to) : 'Present'}

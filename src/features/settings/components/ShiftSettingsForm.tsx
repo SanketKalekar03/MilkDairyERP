@@ -15,10 +15,10 @@ export const ShiftSettingsForm: React.FC = () => {
 
   const [dairyName, setDairyName] = useState('');
   const [timezone, setTimezone] = useState('Asia/Kolkata');
-  const [morningStart, setMorningStart] = useState('04:00');
-  const [morningEnd, setMorningEnd] = useState('12:00');
-  const [eveningStart, setEveningStart] = useState('15:00');
-  const [eveningEnd, setEveningEnd] = useState('22:00');
+  const [morningStart, setMorningStart] = useState('06:00');
+  const [morningEnd, setMorningEnd] = useState('18:00');
+  const [eveningStart, setEveningStart] = useState('18:00');
+  const [eveningEnd, setEveningEnd] = useState('06:00');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);

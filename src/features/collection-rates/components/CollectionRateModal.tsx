@@ -3,8 +3,8 @@ import { Dialog } from '../../../components/ui/Dialog';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
 import { collectionRateService } from '../services/collectionRateService';
-import type { MilkType, QuantityUnit } from '../../../types/database';
-import { MILK_TYPES, QUANTITY_UNITS } from '../../../lib/constants';
+import type { MilkType } from '../../../types/database';
+import { MILK_TYPES } from '../../../lib/constants';
 import { getTodayDateString } from '../../../lib/utils';
 
 export interface CollectionRateModalProps {
@@ -19,9 +19,8 @@ export const CollectionRateModal: React.FC<CollectionRateModalProps> = ({
   onSuccess,
 }) => {
   const [milkType, setMilkType] = useState<MilkType>('cow');
-  const [quantityUnit, setQuantityUnit] = useState<QuantityUnit>('litre');
-  const [fatMin, setFatMin] = useState<string>('3.5');
-  const [fatMax, setFatMax] = useState<string>('4.5');
+  const [fatMin, setFatMin] = useState<string>('2.0');
+  const [fatMax, setFatMax] = useState<string>('5.0');
   const [ratePerUnit, setRatePerUnit] = useState<string>('38.00');
   const [validFrom, setValidFrom] = useState<string>(getTodayDateString());
   const [validTo, setValidTo] = useState<string>('');
@@ -40,7 +39,7 @@ export const CollectionRateModal: React.FC<CollectionRateModalProps> = ({
       return;
     }
     if (isNaN(rate) || rate <= 0) {
-      setError('Rate per unit must be greater than 0.');
+      setError('Rate per litre must be greater than 0.');
       return;
     }
     if (!validFrom) {
@@ -57,7 +56,7 @@ export const CollectionRateModal: React.FC<CollectionRateModalProps> = ({
     try {
       await collectionRateService.createCollectionRate({
         milk_type: milkType,
-        quantity_unit: quantityUnit,
+        quantity_unit: 'litre',
         fat_min: min,
         fat_max: max,
         rate_per_unit: rate,
@@ -78,7 +77,7 @@ export const CollectionRateModal: React.FC<CollectionRateModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Create Collection Rate Rule"
-      description="Add an effective-dated fat-based purchase rate rule. Existing transactions remain untouched."
+      description="Add an effective-dated fat-based purchase rate rule in Litres. Existing transactions remain untouched."
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,20 +108,14 @@ export const CollectionRateModal: React.FC<CollectionRateModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[#2F4156] mb-1.5">
-              Quantity Unit <span className="text-red-500">*</span>
+              Measurement Unit
             </label>
-            <select
-              value={quantityUnit}
-              onChange={(e) => setQuantityUnit(e.target.value as QuantityUnit)}
-              disabled={isSubmitting}
-              className="w-full bg-white text-[#2F4156] px-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
-            >
-              {QUANTITY_UNITS.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
+            <input
+              type="text"
+              readOnly
+              value="Litre (L)"
+              className="w-full bg-[#F5EFEB] text-[#2F4156] px-3 py-2 text-sm rounded border border-[#afc4d4] font-medium cursor-not-allowed"
+            />
           </div>
         </div>
 
@@ -150,7 +143,7 @@ export const CollectionRateModal: React.FC<CollectionRateModalProps> = ({
         </div>
 
         <Input
-          label={`Rate per ${quantityUnit === 'kg' ? 'Kilogram (₹/kg)' : 'Litre (₹/L)'}`}
+          label="Rate per Litre (₹/L)"
           type="number"
           step="0.01"
           min="0.01"

@@ -228,10 +228,10 @@ INSERT INTO public.dairy_settings (
 ) VALUES (
   'Gokul Dairy Cooperative',
   'Asia/Kolkata',
-  '04:00:00',
-  '12:00:00',
-  '15:00:00',
-  '22:00:00',
+  '06:00:00',
+  '18:00:00',
+  '18:00:00',
+  '06:00:00',
   true
 ) ON CONFLICT (is_default) DO UPDATE SET
   dairy_name = EXCLUDED.dairy_name,
@@ -241,32 +241,79 @@ INSERT INTO public.dairy_settings (
   evening_start = EXCLUDED.evening_start,
   evening_end = EXCLUDED.evening_end;
 
+-- Function: get_current_shift (Automatic 6AM - 6PM shift transitions)
+CREATE OR REPLACE FUNCTION get_current_shift()
+RETURNS JSONB AS $$
+DECLARE
+  v_settings RECORD;
+  v_local_timestamp TIMESTAMPTZ;
+  v_local_time TIME;
+  v_business_date DATE;
+  v_shift milk_shift;
+  v_is_active BOOLEAN := true;
+  v_morning_start TIME := '06:00:00'::time;
+  v_morning_end TIME := '18:00:00'::time;
+  v_evening_start TIME := '18:00:00'::time;
+  v_evening_end TIME := '06:00:00'::time;
+  v_timezone TEXT := 'Asia/Kolkata';
+BEGIN
+  SELECT * INTO v_settings FROM public.dairy_settings WHERE is_default = true LIMIT 1;
+  IF FOUND THEN
+    IF v_settings.timezone IS NOT NULL THEN v_timezone := v_settings.timezone; END IF;
+    IF v_settings.morning_start IS NOT NULL THEN v_morning_start := v_settings.morning_start; END IF;
+    IF v_settings.morning_end IS NOT NULL THEN v_morning_end := v_settings.morning_end; END IF;
+    IF v_settings.evening_start IS NOT NULL THEN v_evening_start := v_settings.evening_start; END IF;
+    IF v_settings.evening_end IS NOT NULL THEN v_evening_end := v_settings.evening_end; END IF;
+  END IF;
+
+  v_local_timestamp := timezone(v_timezone, now());
+  v_local_time := v_local_timestamp::time;
+  v_business_date := v_local_timestamp::date;
+
+  IF v_local_time >= v_morning_start AND v_local_time < v_evening_start THEN
+    v_shift := 'morning';
+    v_is_active := true;
+    v_business_date := v_local_timestamp::date;
+  ELSE
+    v_shift := 'evening';
+    v_is_active := true;
+    IF v_local_time < v_morning_start THEN
+      v_business_date := (v_local_timestamp - INTERVAL '1 day')::date;
+    ELSE
+      v_business_date := v_local_timestamp::date;
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'shift', v_shift,
+    'business_date', v_business_date,
+    'is_active', v_is_active,
+    'local_time', to_char(v_local_time, 'HH24:MI:SS'),
+    'timezone', v_timezone,
+    'morning_window', concat(to_char(v_morning_start, 'HH24:MI'), ' - ', to_char(v_evening_start, 'HH24:MI')),
+    'evening_window', concat(to_char(v_evening_start, 'HH24:MI'), ' - ', to_char(v_morning_start, 'HH24:MI'))
+  );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION get_current_shift() TO anon, authenticated, service_role;
+
 
 -- --------------------------------------------------------------------
--- 3. SEED COLLECTION RATE RULES (Cow & Buffalo in kg and litre)
+-- 3. SEED COLLECTION RATE RULES (Cow & Buffalo in Litres)
 -- --------------------------------------------------------------------
 DELETE FROM public.collection_rate_rules;
 
 INSERT INTO public.collection_rate_rules (milk_type, quantity_unit, fat_min, fat_max, rate_per_unit, valid_from, valid_to) VALUES
--- Cow Milk (kg)
-('cow', 'kg', 3.0, 4.0, 35.00, '2026-01-01', NULL),
-('cow', 'kg', 4.0, 5.0, 38.50, '2026-01-01', NULL),
-('cow', 'kg', 5.0, 7.0, 42.00, '2026-01-01', NULL),
-
 -- Cow Milk (litre)
-('cow', 'litre', 3.0, 4.0, 36.00, '2026-01-01', NULL),
-('cow', 'litre', 4.0, 5.0, 39.50, '2026-01-01', NULL),
-('cow', 'litre', 5.0, 7.0, 43.50, '2026-01-01', NULL),
-
--- Buffalo Milk (kg)
-('buffalo', 'kg', 5.0, 6.5, 50.00, '2026-01-01', NULL),
-('buffalo', 'kg', 6.5, 8.0, 56.00, '2026-01-01', NULL),
-('buffalo', 'kg', 8.0, 11.0, 63.00, '2026-01-01', NULL),
+('cow', 'litre', 2.0, 4.0, 36.00, '2026-01-01', NULL),
+('cow', 'litre', 4.0, 5.5, 39.50, '2026-01-01', NULL),
+('cow', 'litre', 5.5, 8.0, 43.50, '2026-01-01', NULL),
 
 -- Buffalo Milk (litre)
-('buffalo', 'litre', 5.0, 6.5, 52.00, '2026-01-01', NULL),
-('buffalo', 'litre', 6.5, 8.0, 58.50, '2026-01-01', NULL),
-('buffalo', 'litre', 8.0, 11.0, 66.00, '2026-01-01', NULL);
+('buffalo', 'litre', 4.0, 6.5, 52.00, '2026-01-01', NULL),
+('buffalo', 'litre', 6.5, 8.5, 58.50, '2026-01-01', NULL),
+('buffalo', 'litre', 8.5, 12.0, 66.00, '2026-01-01', NULL);
 
 
 -- --------------------------------------------------------------------

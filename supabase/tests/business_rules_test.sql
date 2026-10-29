@@ -41,12 +41,12 @@ BEGIN
 
   -- Initialize Settings
   INSERT INTO dairy_settings (dairy_name, timezone, morning_start, morning_end, evening_start, evening_end, is_default)
-  VALUES ('Test Dairy', 'Asia/Kolkata', '04:00:00', '12:00:00', '15:00:00', '22:00:00', true)
+  VALUES ('Test Dairy', 'Asia/Kolkata', '06:00:00', '18:00:00', '18:00:00', '06:00:00', true)
   ON CONFLICT (is_default) DO UPDATE SET
-    morning_start = '04:00:00',
-    morning_end = '12:00:00',
-    evening_start = '15:00:00',
-    evening_end = '22:00:00';
+    morning_start = '06:00:00',
+    morning_end = '18:00:00',
+    evening_start = '18:00:00',
+    evening_end = '06:00:00';
 
   -- Create Farmers and Customers
   INSERT INTO farmers (name, phone, is_active) VALUES ('Farmer Ram', '9999900001', true) RETURNING id INTO v_farmer_id;

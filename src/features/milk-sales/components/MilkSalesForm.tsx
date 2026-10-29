@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { milkSalesSchema } from '../schemas/salesSchema';
 import type { MilkSalesFormData } from '../schemas/salesSchema';
 import { milkSalesService } from '../services/milkSalesService';
+import { stockService } from '../../stock/services/stockService';
 import { useCustomers } from '../../customers/hooks/useCustomers';
 import { useShift } from '../../../app/providers/ShiftProvider';
 import { PageHeader } from '../../../components/layout/PageHeader';
@@ -12,7 +13,8 @@ import { Button } from '../../../components/ui/Button';
 import { ShiftBadge } from '../../../components/ui/ShiftBadge';
 import { MILK_TYPES } from '../../../lib/constants';
 import { formatCurrency, formatDate } from '../../../lib/utils';
-import { Store, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Store, CheckCircle2, AlertCircle, Layers, AlertTriangle } from 'lucide-react';
+import type { MilkType } from '../../../types/database';
 
 export const MilkSalesForm: React.FC = () => {
   const { customers, isLoading: loadingCustomers } = useCustomers(true);
@@ -23,6 +25,10 @@ export const MilkSalesForm: React.FC = () => {
   const [isCheckingRate, setIsCheckingRate] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Stock management state
+  const [availableStock, setAvailableStock] = useState<number | null>(null);
+  const [isLoadingStock, setIsLoadingStock] = useState(false);
 
   const {
     register,
@@ -39,8 +45,28 @@ export const MilkSalesForm: React.FC = () => {
     },
   });
 
-  const selectedMilkType = watch('milk_type');
+  const selectedMilkType = watch('milk_type') as MilkType;
   const enteredQtyLitres = watch('quantity_litres');
+
+  // Load available stock whenever selected milk type changes
+  const fetchStock = async (mType: MilkType) => {
+    setIsLoadingStock(true);
+    try {
+      const stock = await stockService.getAvailableStock(mType);
+      setAvailableStock(stock);
+    } catch (err) {
+      console.warn('Failed to fetch stock:', err);
+      setAvailableStock(null);
+    } finally {
+      setIsLoadingStock(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedMilkType) {
+      fetchStock(selectedMilkType);
+    }
+  }, [selectedMilkType]);
 
   // Preview applicable selling rate
   useEffect(() => {
@@ -67,17 +93,37 @@ export const MilkSalesForm: React.FC = () => {
     }
   }, [selectedMilkType, shiftInfo?.business_date]);
 
+  const hasInsufficientStock =
+    availableStock !== null &&
+    enteredQtyLitres !== undefined &&
+    !isNaN(Number(enteredQtyLitres)) &&
+    Number(enteredQtyLitres) > 0 &&
+    Number(enteredQtyLitres) > availableStock;
+
+  const isStockEmpty = availableStock !== null && availableStock <= 0;
+
   const estimatedAmount =
     previewRate !== null &&
     enteredQtyLitres &&
-    !isNaN(enteredQtyLitres) &&
-    enteredQtyLitres > 0
+    !isNaN(Number(enteredQtyLitres)) &&
+    Number(enteredQtyLitres) > 0
       ? Math.round(Number(enteredQtyLitres) * previewRate * 100) / 100
       : null;
 
   const onSubmit = async (data: MilkSalesFormData) => {
     setSuccessMessage(null);
     setSubmitError(null);
+
+    // Double check stock client-side before sending
+    if (availableStock !== null && Number(data.quantity_litres) > availableStock) {
+      setSubmitError(
+        `Insufficient stock! Only ${availableStock.toFixed(3)} L of ${
+          data.milk_type === 'cow' ? 'Cow' : 'Buffalo'
+        } milk available. Cannot sell ${data.quantity_litres} L.`
+      );
+      return;
+    }
+
     try {
       const response = await milkSalesService.recordSale({
         customerId: data.customer_id,
@@ -86,10 +132,13 @@ export const MilkSalesForm: React.FC = () => {
       });
 
       setSuccessMessage(
-        `Milk sale recorded successfully! Customer: ${response.customer_name}, Amount: ${formatCurrency(
+        `Milk sale recorded successfully! Customer: ${response.customer_name}, Quantity: ${response.quantity_litres} L, Amount: ${formatCurrency(
           response.amount
         )} (Rate: ₹${response.applied_rate}/L)`
       );
+
+      // Refresh stock balance immediately
+      await fetchStock(data.milk_type);
 
       // Reset form but retain selected milk type
       reset({
@@ -102,43 +151,27 @@ export const MilkSalesForm: React.FC = () => {
     }
   };
 
-  const currentShift = shiftInfo?.shift || 'morning';
-
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <PageHeader
-        title="Record Milk Sale"
-        subtitle="Record daily milk sales to retail and bulk customers strictly in litres."
+        title="Milk Sales Entry"
+        description="Record customer milk sales in litres with real-time stock balance validation."
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#567C8D] font-medium hidden sm:inline">
+              Session Shift:
+            </span>
+            <ShiftBadge shift={shiftInfo?.shift || 'morning'} />
+            <span className="text-xs text-[#567C8D] font-mono ml-1">
+              ({formatDate(shiftInfo?.business_date)})
+            </span>
+          </div>
+        }
       />
-
-      {/* Current Shift Informational Notice */}
-      <div className="bg-white p-4 rounded border border-[#afc4d4] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded bg-[#F5EFEB] flex items-center justify-center text-[#2F4156] border border-[#afc4d4]">
-            <Store className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-[#567C8D] font-bold uppercase tracking-wider">
-                Current Shift:
-              </span>
-              <ShiftBadge shift={currentShift} />
-              {!shiftInfo?.is_active && (
-                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold">
-                  Outside Standard Shift Window
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[#567C8D] mt-0.5">
-              Shift is automatically determined by backend server clock ({formatDate(shiftInfo?.business_date)}).
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Success Notification */}
       {successMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded text-emerald-900 text-xs flex items-center gap-2.5">
+        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded text-emerald-900 text-sm flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span className="font-medium">{successMessage}</span>
         </div>
@@ -146,7 +179,7 @@ export const MilkSalesForm: React.FC = () => {
 
       {/* Error Notification */}
       {submitError && (
-        <div className="p-4 bg-rose-50 border border-rose-300 rounded text-rose-900 text-xs flex items-center gap-2.5">
+        <div className="p-4 bg-rose-50 border border-rose-300 rounded text-rose-900 text-sm flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <span className="font-medium">{submitError}</span>
         </div>
@@ -155,10 +188,15 @@ export const MilkSalesForm: React.FC = () => {
       {/* Main Sales Form */}
       <Card className="border-[#afc4d4]">
         <CardHeader className="bg-[#F5EFEB] py-3.5">
-          <CardTitle className="text-sm">Sales Entry Form</CardTitle>
-          <span className="text-xs text-[#567C8D] font-medium">
-            Standard unit: Litres (L)
-          </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Store className="w-4 h-4 text-[#2F4156]" />
+              <CardTitle className="text-sm">Sales Entry Form</CardTitle>
+            </div>
+            <span className="text-xs text-[#567C8D] font-medium">
+              Standard unit: Litres (L)
+            </span>
+          </div>
         </CardHeader>
 
         <CardContent className="p-6">
@@ -191,7 +229,7 @@ export const MilkSalesForm: React.FC = () => {
               )}
             </div>
 
-            {/* Milk Type & Litres */}
+            {/* Milk Type & Available Stock Banner */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Milk Type */}
               <div>
@@ -217,12 +255,37 @@ export const MilkSalesForm: React.FC = () => {
 
               {/* Quantity in Litres */}
               <div>
-                <label
-                  htmlFor="quantity_litres"
-                  className="block text-xs font-semibold uppercase tracking-wider text-[#2F4156] mb-1.5"
-                >
-                  Quantity (Litres) <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="quantity_litres"
+                    className="block text-xs font-semibold uppercase tracking-wider text-[#2F4156]"
+                  >
+                    Quantity (Litres) <span className="text-red-500">*</span>
+                  </label>
+
+                  {/* Real-time Available Stock Badge */}
+                  <span
+                    className={`text-[11px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
+                      availableStock === null || isLoadingStock
+                        ? 'bg-gray-100 text-gray-500 border-gray-200'
+                        : availableStock > 5
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold'
+                        : availableStock > 0
+                        ? 'bg-amber-50 text-amber-800 border-amber-300 font-semibold'
+                        : 'bg-rose-50 text-rose-800 border-rose-300 font-bold'
+                    }`}
+                  >
+                    <Layers className="w-3 h-3" />
+                    <span>
+                      {isLoadingStock
+                        ? 'Checking stock...'
+                        : availableStock !== null
+                        ? `Stock: ${availableStock.toFixed(3)} L`
+                        : 'Stock unavailable'}
+                    </span>
+                  </span>
+                </div>
+
                 <input
                   id="quantity_litres"
                   type="number"
@@ -230,12 +293,35 @@ export const MilkSalesForm: React.FC = () => {
                   min="0.001"
                   placeholder="e.g. 5.000"
                   disabled={isSubmitting}
-                  className="w-full bg-white text-[#2F4156] px-3 py-2 text-sm rounded border border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]"
+                  className={`w-full bg-white text-[#2F4156] px-3 py-2 text-sm rounded border ${
+                    hasInsufficientStock
+                      ? 'border-red-500 focus:ring-red-500'
+                      : 'border-[#afc4d4] focus:border-[#567C8D] focus:ring-1 focus:ring-[#567C8D]'
+                  }`}
                   {...register('quantity_litres', { valueAsNumber: true })}
                 />
                 {errors.quantity_litres && (
                   <p className="mt-1 text-xs text-red-600 font-medium">
                     {errors.quantity_litres.message}
+                  </p>
+                )}
+
+                {/* Stock Warning Message */}
+                {hasInsufficientStock && (
+                  <p className="mt-1.5 text-xs text-rose-600 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span>
+                      Insufficient stock! Only {availableStock?.toFixed(3)} L available.
+                    </span>
+                  </p>
+                )}
+
+                {isStockEmpty && (
+                  <p className="mt-1.5 text-xs text-amber-700 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>
+                      Zero stock available for {selectedMilkType === 'cow' ? 'Cow' : 'Buffalo'} Milk. Please record collection first.
+                    </span>
                   </p>
                 )}
               </div>
@@ -278,7 +364,7 @@ export const MilkSalesForm: React.FC = () => {
                 size="md"
                 isLoading={isSubmitting}
                 loadingText="Recording Milk Sale..."
-                disabled={Boolean(rateError)}
+                disabled={Boolean(rateError) || hasInsufficientStock || isStockEmpty}
               >
                 Save Sales Transaction
               </Button>

@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Layers,
   Milk,
   ReceiptText,
   Users,
@@ -102,6 +103,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <NavLink to="/dashboard" onClick={onClose} className={navLinkClasses}>
               <LayoutDashboard className="w-4 h-4 shrink-0" />
               <span>Dashboard</span>
+            </NavLink>
+
+            <NavLink to="/stock" onClick={onClose} className={navLinkClasses}>
+              <Layers className="w-4 h-4 shrink-0" />
+              <span>Milk Stock</span>
             </NavLink>
 
             {/* Collection Group */}

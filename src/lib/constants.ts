@@ -15,7 +15,6 @@ export const MILK_TYPES = [
 
 export const QUANTITY_UNITS = [
   { value: 'litre', label: 'Litre (L)' },
-  { value: 'kg', label: 'Kilogram (kg)' },
 ] as const;
 
 export const SHIFT_OPTIONS = [

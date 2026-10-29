@@ -57,3 +57,37 @@ input:focus, select:focus, textarea:focus {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* Print Media Styles for Professional Dairy Billing Invoices */
+@media print {
+  /* Hide the web application UI entirely */
+  body.printing-invoice #root,
+  body:has(#printable-invoice) #root {
+    display: none !important;
+  }
+
+  /* Display only the printable invoice component */
+  body.printing-invoice #printable-invoice,
+  body:has(#printable-invoice) #printable-invoice {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  table, tr, td, th {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm 12mm 15mm;
+  }
+}

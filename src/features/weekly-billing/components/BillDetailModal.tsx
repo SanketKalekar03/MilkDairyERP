@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Dialog } from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
@@ -6,6 +7,7 @@ import { ShiftBadge } from '../../../components/ui/ShiftBadge';
 import { MilkTypeBadge } from '../../../components/ui/MilkTypeBadge';
 import { BillSkeleton } from '../../../components/skeletons/BillSkeleton';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog';
+import { PrintableInvoice } from './PrintableInvoice';
 import { weeklyBillingService } from '../services/weeklyBillingService';
 import type { FarmerWeeklyBill, CustomerWeeklyBill, MilkCollection, MilkSale } from '../../../types/database';
 import { formatCurrency, formatQuantity, formatDate } from '../../../lib/utils';
@@ -92,6 +94,21 @@ export const BillDetailModal: React.FC<BillDetailModalProps> = ({
       ? (bill as FarmerWeeklyBill)?.farmer?.name || 'Farmer'
       : (bill as CustomerWeeklyBill)?.customer?.name || 'Customer';
 
+  const handlePrint = () => {
+    document.body.classList.add('printing-invoice');
+    window.print();
+    window.addEventListener(
+      'afterprint',
+      () => {
+        document.body.classList.remove('printing-invoice');
+      },
+      { once: true }
+    );
+    setTimeout(() => {
+      document.body.classList.remove('printing-invoice');
+    }, 2000);
+  };
+
   return (
     <>
       <Dialog
@@ -140,7 +157,7 @@ export const BillDetailModal: React.FC<BillDetailModalProps> = ({
                       <th className="py-2.5 px-3">Date</th>
                       <th className="py-2.5 px-3">Shift</th>
                       <th className="py-2.5 px-3">Type</th>
-                      <th className="py-2.5 px-3 text-right">Qty</th>
+                      <th className="py-2.5 px-3 text-right">Litres (L)</th>
                       <th className="py-2.5 px-3 text-right">Fat %</th>
                       <th className="py-2.5 px-3 text-right">Rate</th>
                       <th className="py-2.5 px-3 text-right">Amount (₹)</th>
@@ -150,7 +167,7 @@ export const BillDetailModal: React.FC<BillDetailModalProps> = ({
                       <th className="py-2.5 px-3">Date</th>
                       <th className="py-2.5 px-3">Shift</th>
                       <th className="py-2.5 px-3">Type</th>
-                      <th className="py-2.5 px-3 text-right">Litres</th>
+                      <th className="py-2.5 px-3 text-right">Litres (L)</th>
                       <th className="py-2.5 px-3 text-right">Rate</th>
                       <th className="py-2.5 px-3 text-right">Amount (₹)</th>
                     </tr>
@@ -170,7 +187,7 @@ export const BillDetailModal: React.FC<BillDetailModalProps> = ({
                             <MilkTypeBadge type={item.milk_type} />
                           </td>
                           <td className="py-2 px-3 text-right font-mono">
-                            {formatQuantity(item.quantity, item.quantity_unit)}
+                            {formatQuantity(item.quantity)}
                           </td>
                           <td className="py-2 px-3 text-right font-mono">
                             {item.fat_percent.toFixed(1)}%
@@ -229,7 +246,7 @@ export const BillDetailModal: React.FC<BillDetailModalProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.print()}
+                onClick={handlePrint}
                 leftIcon={<Printer className="w-4 h-4" />}
               >
                 Print Invoice
@@ -254,6 +271,18 @@ export const BillDetailModal: React.FC<BillDetailModalProps> = ({
           </div>
         ) : null}
       </Dialog>
+
+      {/* Official Printable Invoice Portal (renders cleanly on paper / PDF without modal frame or buttons) */}
+      {isOpen && bill && typeof document !== 'undefined' &&
+        createPortal(
+          <PrintableInvoice
+            bill={bill}
+            items={type === 'farmer' ? farmerItems : customerItems}
+            type={type}
+            entityName={entityName}
+          />,
+          document.body
+        )}
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

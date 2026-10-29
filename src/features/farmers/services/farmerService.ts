@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../../../lib/supabase';
 import type { Farmer } from '../../../types/database';
+import { validateIndianMobileNumber } from '../../../lib/validation';
 
 export const farmerService = {
   async getFarmers(activeOnly = true): Promise<Farmer[]> {
@@ -26,6 +27,13 @@ export const farmerService = {
   async createFarmer(name: string, phone?: string): Promise<Farmer> {
     if (!isSupabaseConfigured) throw new Error('Supabase not configured');
 
+    const cleanPhone = phone?.trim();
+    if (cleanPhone) {
+      const { isValid, error, cleaned } = validateIndianMobileNumber(cleanPhone);
+      if (!isValid) throw new Error(error || 'Invalid 10-digit mobile number');
+      phone = cleaned;
+    }
+
     const { data, error } = await supabase
       .from('farmers')
       .insert({ name: name.trim(), phone: phone?.trim() || null })
@@ -41,6 +49,17 @@ export const farmerService = {
 
   async updateFarmer(id: string, updates: { name?: string; phone?: string; is_active?: boolean }): Promise<Farmer> {
     if (!isSupabaseConfigured) throw new Error('Supabase not configured');
+
+    if (updates.phone !== undefined) {
+      const cleanPhone = updates.phone?.trim();
+      if (cleanPhone) {
+        const { isValid, error, cleaned } = validateIndianMobileNumber(cleanPhone);
+        if (!isValid) throw new Error(error || 'Invalid 10-digit mobile number');
+        updates.phone = cleaned;
+      } else {
+        updates.phone = undefined;
+      }
+    }
 
     const { data, error } = await supabase
       .from('farmers')

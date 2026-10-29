@@ -16,22 +16,37 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Determine shift automatically based on system timing:
+   * - Morning Shift: starts at 6:00 AM (06:00) and ends at 6:00 PM (18:00)
+   * - Evening Shift: starts at exact 6:00 PM (18:00) and ends at 6:00 AM (06:00)
+   */
+  const getSystemTimingShift = useCallback((): ShiftInfo => {
+    const now = new Date();
+    const hours = now.getHours();
+    const isMorning = hours >= 6 && hours < 18;
+    // Between 00:00 and 05:59, evening shift belongs to previous calendar day
+    const isPastMidnightEvening = hours < 6;
+    const businessDate = isPastMidnightEvening
+      ? new Date(now.getTime() - 86400000).toISOString().split('T')[0]
+      : now.toISOString().split('T')[0];
+
+    return {
+      shift: isMorning ? 'morning' : 'evening',
+      business_date: businessDate,
+      is_active: true,
+      local_time: now.toLocaleTimeString(),
+      timezone: 'Asia/Kolkata',
+      morning_window: '06:00 - 18:00',
+      evening_window: '18:00 - 06:00',
+    };
+  }, []);
+
   const fetchShift = useCallback(async () => {
+    const systemShift = getSystemTimingShift();
+
     if (!isSupabaseConfigured) {
-      // Informational fallback when Supabase keys not set yet
-      const now = new Date();
-      const hours = now.getHours();
-      const isMorning = hours >= 4 && hours < 12;
-      const isEvening = hours >= 15 && hours < 22;
-      setShiftInfo({
-        shift: isMorning ? 'morning' : isEvening ? 'evening' : 'morning',
-        business_date: now.toISOString().split('T')[0],
-        is_active: isMorning || isEvening,
-        local_time: now.toLocaleTimeString(),
-        timezone: 'Asia/Kolkata',
-        morning_window: '04:00 - 12:00',
-        evening_window: '15:00 - 22:00',
-      });
+      setShiftInfo(systemShift);
       setIsLoading(false);
       return;
     }
@@ -41,21 +56,49 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (rpcError) {
         throw rpcError;
       }
-      setShiftInfo(data as ShiftInfo);
+      if (data) {
+        // Enforce the 6:00 AM & 6:00 PM automatic system timing rule across the application
+        const now = new Date();
+        const hours = now.getHours();
+        const expectedShift = hours >= 6 && hours < 18 ? 'morning' : 'evening';
+        const isPastMidnightEvening = hours < 6;
+        const businessDate = isPastMidnightEvening
+          ? new Date(now.getTime() - 86400000).toISOString().split('T')[0]
+          : data.business_date || systemShift.business_date;
+
+        setShiftInfo({
+          ...(data as ShiftInfo),
+          shift: expectedShift,
+          business_date: businessDate,
+          is_active: true,
+          morning_window: '06:00 - 18:00',
+          evening_window: '18:00 - 06:00',
+        });
+      } else {
+        setShiftInfo(systemShift);
+      }
       setError(null);
     } catch (err: any) {
-      console.warn('Failed to fetch shift from backend, will retry:', err.message);
-      setError(err.message || 'Failed to detect current shift');
+      console.warn('Backend shift check failed, using system timing:', err.message);
+      setShiftInfo(systemShift);
+      setError(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [getSystemTimingShift]);
 
   useEffect(() => {
     fetchShift();
-    // Re-check shift every 60 seconds to catch shift transitions automatically
-    const interval = setInterval(fetchShift, 60000);
-    return () => clearInterval(interval);
+    // Check every 15 seconds to ensure seamless automatic transition at exact 6:00 AM and 6:00 PM
+    const interval = setInterval(fetchShift, 15000);
+    const handleFocus = () => fetchShift();
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
+    };
   }, [fetchShift]);
 
   return (
